@@ -4,9 +4,43 @@ import json
 from time import time
 from urllib.parse import urlparse
 from uuid import uuid4
+import time
+import threading
 
 import requests
 from flask import Flask, jsonify, request
+
+class BlockWorker():
+    def __init__(self, blockchain, interval):
+        self.blockchain = blockchain
+        self.interval = interval
+
+    def run(self):
+        while True:
+            self.blockchain.cultivate_neighbours()
+            self.mine()
+            self.blockchain.resolve_conflicts()
+            time.sleep(self.interval)
+
+    def start(self):
+        threading.Thread(target=self.run, args=list()).start()
+
+    def mine(self):
+        if len(self.blockchain.current_transactions) > 0:
+            last_block = self.blockchain.last_block
+            proof = self.blockchain.proof_of_work(last_block)
+
+            # We must receive a reward for finding the proof.
+            # The sender is "0" to signify that this node has mined a new coin.
+            self.blockchain.new_transaction(
+                sender="0",
+                recipient=node_identifier,
+                amount=1,
+            )
+
+            # Forge the new Block by adding it to the chain
+            previous_hash = self.blockchain.hash(last_block)
+            block = self.blockchain.new_block(proof, previous_hash)
 
 
 class Blockchain:
@@ -17,6 +51,8 @@ class Blockchain:
 
         # genesis block
         self.new_block(previous_hash='1', proof=100)
+        bw = BlockWorker(self, 3)
+        bw.start()
 
     def register_node(self, address):
 
@@ -55,7 +91,7 @@ class Blockchain:
 
     def resolve_conflicts(self):
 
-        neighbours = self.nodes
+        neighbours = list(self.nodes)
         new_chain = None
 
         # We're only looking for chains longer than ours
@@ -81,11 +117,22 @@ class Blockchain:
 
         return False
 
+    def cultivate_neighbours(self):
+
+        neighbours = list(self.nodes)
+        for neighbour in neighbours:
+            response = requests.get(f'http://{neighbour}/nodes')
+
+            if response.status_code == 200:
+                nodes = response.json()['nodes']
+                for node in nodes:
+                    self.register_node(f'http://{node}')
+
     def new_block(self, proof, previous_hash):
 
         block = {
             'index': len(self.chain) + 1,
-            'timestamp': time(),
+            'timestamp': time.time(),
             'transactions': self.current_transactions,
             'proof': proof,
             'previous_hash': previous_hash or self.hash(self.chain[-1]),
