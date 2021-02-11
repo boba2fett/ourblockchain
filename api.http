@@ -1,0 +1,21 @@
+POST http://localhost:4400/nodes/register HTTP/1.1
+content-type: application/json
+
+{
+    "nodes":["http://localhost:4401"]
+}
+###
+POST http://localhost:4400/transactions/new HTTP/1.1
+content-type: application/json
+
+{
+    "sender":"I send",
+    "recipient":"I recieve",
+    "amount":1
+}
+###
+GET http://localhost:4400/chain HTTP/1.1
+###
+GET http://localhost:4400/nodes/resolve HTTP/1.1
+###
+GET http://localhost:4400/mine HTTP/1.1
